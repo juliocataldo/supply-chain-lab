@@ -14,7 +14,7 @@ header h1{font-size:16px;margin:0;margin-right:auto}header h1 small{color:var(--
 .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;text-align:center;min-width:92px}
 .kpi b{display:block;font-size:18px}.kpi span{color:var(--mut);font-size:11px}
 input[type=text],textarea{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;width:100%}
-header input{width:190px}
+header input[type=text]{width:190px}
 button{background:var(--acc);color:#04111f;border:0;border-radius:6px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
 button.sec{background:var(--panel2);color:var(--tx);border:1px solid var(--line)}
 button:disabled{opacity:.5;cursor:not-allowed}
@@ -49,6 +49,7 @@ dialog{background:var(--panel);color:var(--tx);border:1px solid var(--line);bord
   <div class="kpi"><b id="kOk">0</b><span>Vereditos certos</span></div>
   <div class="kpi"><b id="kChk">0</b><span>Verificações feitas</span></div>
   <button class="sec" id="bRep">Relatório</button>
+  <button class="sec" id="bJson" title="Resultado estruturado para o professor">Exportar .json</button>
   <button id="bDeb">Debrief</button>
   <button class="sec" id="bRst">Reiniciar</button>
 </header>
@@ -215,9 +216,10 @@ function form(c,done){
   f.append(h('div',{class:'grid2'},g('r','Sinais de risco que você observou'),g('p','Sinais a favor')));
   f.append(h('fieldset',null,h('legend',null,'Ações que você tomaria'),...Object.entries(ACTS).map(([k,t])=>h('label',{class:'opt'},h('input',{type:'checkbox',name:'a',value:k,checked:A.a&&A.a.includes(k)?'':false,disabled:done?'':false}),' '+t))));
   const note=h('textarea',{rows:'2',maxlength:'400',placeholder:'Justificativa: qual evidência decidiu o seu veredito?',disabled:done?'':false},A.note||'');const err=h('div',{class:'err',role:'alert'});
-  f.append(note,err,h('button',{disabled:done?'':false,onclick:()=>{const v=(f.querySelector('[name=v]:checked')||{}).value;const s=[...f.querySelectorAll('[name=s]:checked')].map(x=>x.value),a=[...f.querySelectorAll('[name=a]:checked')].map(x=>x.value);
-    if(!v||!a.length){err.textContent='Escolha um veredito e ao menos uma ação.';return;}
-    const a2={v,s,a,note:note.value.trim()};S.done[c.id]={a:a2,g:grade(c,a2)};list();detail();}},'Registrar revisão'));
+  const conf=h('select',{id:'conf','aria-label':'Confiança',disabled:done?'':false},h('option',{value:''},'- selecione -'),...[['1','1 - chutei'],['2','2 - insegura(o)'],['3','3 - razoável'],['4','4 - confiante'],['5','5 - tenho certeza']].map(([v,t])=>h('option',{value:v,selected:A.conf===v?'':false},t)));
+  f.append(h('label',{for:'conf',class:'mut'},'Confiança na sua decisão'),conf,note,err,h('button',{disabled:done?'':false,onclick:()=>{const v=(f.querySelector('[name=v]:checked')||{}).value;const s=[...f.querySelectorAll('[name=s]:checked')].map(x=>x.value),a=[...f.querySelectorAll('[name=a]:checked')].map(x=>x.value);
+    if(!v||!a.length||!conf.value){err.textContent='Escolha um veredito, ao menos uma ação e o seu nível de confiança.';return;}
+    const a2={v,s,a,conf:conf.value,note:note.value.trim()};S.done[c.id]={a:a2,g:grade(c,a2)};list();detail();}},'Registrar revisão'));
   return f;
 }
 function setCmp(sel,r){const miss=r.must.filter(x=>!sel.includes(x));const extra=sel.filter(x=>!r.must.includes(x)&&!r.ok.includes(x));return{miss,extra,ok:!miss.length&&!extra.length};}
@@ -234,6 +236,7 @@ function feedback(c,d){const g=d.g,r=c.ref;const pts=[g.v,g.s.ok,g.a.ok].filter(
 /* ===== Debrief e relatório ===== */
 function debrief(){const d=$('#dlg');const dn=Object.values(S.done);
   d.replaceChildren(h('h2',null,'Debrief'),h('p',null,`PRs revisados: ${dn.length}/${CASES.length} | Vereditos certos: ${dn.filter(x=>x.g.v).length} | Verificações executadas: ${Object.values(S.run).reduce((s,x)=>s+x.size,0)}`),
+   h('p',null,h('b',null,'Calibração: '),calibTxt(dn.map(x=>({ok:x.g.v,conf:+x.a.conf}))),'. Errar com confiança alta é o ponto cego mais perigoso: reveja esses casos primeiro.'),
    h('h3',null,'Checklist de revisão de dependência'),h('ol',null,
     h('li',null,'Quem publicou? Mudou o mantenedor recentemente?'),h('li',null,'Tem provenance/assinatura? As versões anteriores tinham?'),h('li',null,'O diff e o changelog contam a mesma história?'),
     h('li',null,'Há script de instalação/build novo, binário opaco ou rede no instalador?'),h('li',null,'O diff do lockfile mudou algo além do pacote do PR? Algum hash mudou sem mudança de versão?'),
@@ -252,6 +255,12 @@ function report(){const who=$('#analyst').value.trim()||'(não informado)';let m
   CASES.forEach(c=>{const d=S.done[c.id];m+=`## ${c.id} - ${c.pkg} ${c.from} -> ${c.to}\n`;if(!d){m+='- Não revisado\n\n';return;}
     m+=`- Veredito: ${VERD[d.a.v]}\n- Sinais: ${d.a.s.map(x=>SIGS[x][0]).join('; ')||'-'}\n- Ações: ${d.a.a.map(x=>ACTS[x]).join('; ')}\n- Justificativa: ${d.a.note||'-'}\n\n`;});
   const b=new Blob([m],{type:'text/markdown'});const u=URL.createObjectURL(b);const l=h('a',{href:u,download:'revisao-dependencias.md'});document.body.append(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+const T0=Date.now();
+function exportJson(lab,items,extra){const o={schema:1,lab,ts:new Date().toISOString(),mins:Math.round((Date.now()-T0)/60000),who:($('#analyst').value.trim()||null),items,extra:extra||{}};
+  const b=new Blob([JSON.stringify(o,null,1)],{type:'application/json'});const u=URL.createObjectURL(b);const l=h('a',{href:u,download:`resultado-${lab}.json`});document.body.append(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+function calibTxt(list){const hi=list.filter(x=>x.conf>=4),lo=list.filter(x=>x.conf&&x.conf<=2);
+  return `confiança alta (4-5): ${hi.filter(x=>x.ok).length} acertos e ${hi.filter(x=>!x.ok).length} erros | confiança baixa (1-2): ${lo.filter(x=>x.ok).length} acertos e ${lo.filter(x=>!x.ok).length} erros`;}
+$('#bJson').addEventListener('click',()=>exportJson('supply-chain',Object.entries(S.done).map(([id,x])=>({id,conf:+x.a.conf,m:{veredito:x.g.v,sinais:x.g.s.ok,acoes:x.g.a.ok}})),{verificacoes:Object.values(S.run).reduce((s,x)=>s+x.size,0)}));
 $('#bDeb').addEventListener('click',debrief);$('#bRep').addEventListener('click',report);
 $('#bRst').addEventListener('click',()=>{if(confirm('Reiniciar? Todo o progresso será apagado.')){fresh();list();detail();}});
 list();detail();

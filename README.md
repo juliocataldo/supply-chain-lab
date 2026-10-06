@@ -53,3 +53,25 @@ Botões do topo: **Relatório** (baixa um `.md`), **Debrief** (checklist e pergu
 - Ambiente de **treino**: errar faz parte.
 - Discuta com a dupla, mas **registre a sua própria revisão**.
 - Não compartilhe a análise de referência com quem ainda não terminou.
+
+## Confiança (metacognição)
+Em cada decisão você informa **o quanto confia nela** (1 = chutei, 5 = tenho certeza). No Debrief você vê seus erros com **confiança alta**: são o ponto cego mais perigoso de um profissional de segurança, e o melhor lugar para estudar primeiro.
+
+## Objetivos de aprendizagem
+Ao final você será capaz de: **avaliar** a confiabilidade de uma atualização de dependência; **justificar** aceitar ou rejeitar com evidências (provenance, SBOM, lockfile, histórico de mantenedores); e **propor controles** para reduzir o risco da cadeia de suprimentos.
+
+## Entregando o resultado (opcional)
+Ao final, clique em **Exportar .json** e envie o arquivo ao professor. Ele agrega os resultados da turma para ver **quais conceitos precisam ser reforçados**; o nome/RM é opcional. O arquivo é só diagnóstico: não vale nota.
+
+## Série de labs (todos sem nota, 100% offline)
+| Lab | Repositório |
+|---|---|
+| Triagem de alertas (SOC) | https://github.com/juliocataldo/soc-lab |
+| Mini-SIEM: caça, detecção e resposta | https://github.com/juliocataldo/soc-lab (pasta `lab2-siem/`) |
+| Threat Modeling: STRIDE + DREAD | https://github.com/juliocataldo/threat-modeling-lab |
+| Supply Chain: revisão de dependências | https://github.com/juliocataldo/supply-chain-lab |
+
+## Para ler depois
+- NIST SP 800-218 (SSDF); SLSA (slsa.dev); SBOM: CycloneDX e SPDX
+- Ohm et al., *Backstabber's Knife Collection* (DIMVA, 2020)
+- Birsan, A., *Dependency Confusion* (2021)
